@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django import forms
 
 
 # Create your models here.
@@ -13,3 +14,7 @@ class financial_info(models.Model):
     results = models.OneToOneField(Results, on_delete= models.PROTECT)
     company=models.CharField(default=None)
 
+
+class UploadPDFForm(forms.Form):
+    title = forms.CharField(max_length=50)
+    file = forms.FileField()
