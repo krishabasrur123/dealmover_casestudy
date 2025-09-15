@@ -1,6 +1,9 @@
-from django.shortcuts import render, HttpResponse, redirect, HttpResponseBadRequest
-from .models import financial_info, UploadPDFForm
+from django.shortcuts import render, HttpResponse, redirect
+from .models import financial_info
+from .forms import UploadPDFForm
 from .serializers import Financial_InfoSerializers
+from django.http import HttpResponseBadRequest
+
 from rest_framework import viewsets
 import PyPDF2
 
@@ -15,19 +18,22 @@ def handle_uploaded_file(uploaded_file, end_date):
     return full_text
 
 
-def upload_file(request, period_end_date):
+def upload_file(request, ):
     if request.method == "POST":
         form = UploadPDFForm(request.POST, request.FILES)
         uploaded_file = request.FILES["file"]
         if form.is_valid() and uploaded_file.name.lower().endswith('.pdf'):
-            handle_uploaded_file(request.FILES["file"], period_end_date)
-            return HttpResponse("File processed")
+            period_end_date = form.cleaned_data.get("period_end_date")
+
+            extracted_text = handle_uploaded_file(request.FILES["file"], period_end_date)
+
+            return HttpResponse(f"<h2>Extracted Text:</h2><pre>{extracted_text}</pre>")
         else:
             return HttpResponseBadRequest("Invalid form or not a PDF file.")
         
     else:
-        UploadPDFForm()
-        return render(request, "upload.html", {"form": form})
+        
+        return render(request, "upload.html", {"form": UploadPDFForm()})
 
 
 class Financial_InfoViewSet(viewsets.ModelViewSet):

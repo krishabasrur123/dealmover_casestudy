@@ -9,5 +9,7 @@ router= DefaultRouter()
 router.register(r'extract', Financial_InfoViewSet)
 urlpatterns=[
     path("api/", include(router.urls)),
+    path("upload/", views.upload_file, name="upload_file"),
+
 ]
 

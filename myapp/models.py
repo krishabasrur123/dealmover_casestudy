@@ -15,6 +15,3 @@ class financial_info(models.Model):
     company=models.CharField(default=None)
 
 
-class UploadPDFForm(forms.Form):
-    title = forms.CharField(max_length=50)
-    file = forms.FileField()
