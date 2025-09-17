@@ -19,66 +19,83 @@ TOC_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-page_num_patterns = [
-    re.compile(r'\bPage\s+(\d+)\b', re.IGNORECASE),
-    re.compile(r'\b(\d+)\s+of\s+\d+\b', re.IGNORECASE),
-    re.compile(r'^\s*(\d{1,3})[.)-]?\s*$', re.MULTILINE),
-    re.compile(r'Form\s+10-K\s+(\d{1,3})\b', re.IGNORECASE)
-]
+page_num_patterns = re.compile(
+    r"""
+    \bPage\s+(\d+)\b |               # Captures "Page 12"
+    \b(\d+)\s+of\s+\d+\b |           # Captures "12 of 50"
+    ^\s*(\d{1,3})[.)-]?\s*$ |        # Captures "12.", "12)", "12-"
+    Form\s+10-K\s+(\d{1,3})\b        # Captures "Form 10-K 12"
+    """,
+    re.IGNORECASE | re.MULTILINE | re.VERBOSE
+)
 
-def find_financial_section(results_dict):
+
+def find_item_8(results_dict):
     print("=== Searching for Item 8 ===")
-    item8_page_num = None
-    for key, text in results_dict.items():
-        m = ITEM8_PATTERN.search(text)
-        if m:
-            item8_page_num = m.group(1)
-            print(f"Found Item 8 on page {key} -> points to page {item8_page_num}")
+    financial_statements_page_num = None
+    for key, page in results_dict.items():
+        item8_text = ITEM8_PATTERN.search(page)
+        if item8_text:
+            financial_statements_page_num = item8_text.group(1)
+            print(f"Found Item 8 on page {key} -> points to page {financial_statements_page_num}")
             break
-    if not item8_page_num:
-        raise ValueError("Item 8 not found")
+    
+    return financial_statements_page_num 
 
+def find_consolidated_statements(financial_statement_page_number, results_dict):
     print("=== Searching for Consolidated Statements after Item 8 ===")
-    toc_page_num = None
-    found_item8 = False
-    for pg in sorted(results_dict.keys(), key=lambda x: int(re.sub(r'\D','0',x))):
-        if pg == item8_page_num:
-            found_item8 = True
-        if found_item8:
-            m = TOC_PATTERN.search(results_dict[pg] or "")
-            if m:
-                toc_page_num = m.group(2)
-                print(f"Found TOC entry '{m.group(1)}' pointing to page {toc_page_num}")
-                break
-    if not toc_page_num:
-        raise ValueError("Could not find Consolidated Statements section after Item 8")
+    consolidated_table_of_content_page_num = None
+    found_financial_statements = None
+    page_content = results_dict.get(financial_statement_page_number)
+        
 
-    if toc_page_num not in results_dict:
-        raise ValueError(f"Page {toc_page_num} not found in extracted pages")
-
-    print(f"Returning text from page {toc_page_num}")
-    return results_dict[toc_page_num]
-
+    m = TOC_PATTERN.search(page_content or "")
+    if m:
+        consolidated_table_of_content_page_num = m.group(2)
+        print(f"Found TOC entry '{m.group(1)}' pointing to page {consolidated_table_of_content_page_num}")
+    return consolidated_table_of_content_page_num
+    
 def handle_uploaded_file(uploaded_file, end_date):
     results = {}
+    financial_statement_page_number=None
+    consolidated_statement_num=None
+    # Step 1 — read all pages into results
     with pdfplumber.open(uploaded_file) as pdf:
         for physical_index, page in enumerate(pdf.pages, start=1):
             text = page.extract_text() or ""
-            printed_number = None
-
-            for pat in page_num_patterns:
-                m = pat.search(text)
-                if m:
-                    printed_number = m.group(1)
-                    break
-
+            m = page_num_patterns.search(text)
+            if m:
+                printed_number = next((g for g in m.groups() if g), None)
+            else:
+                printed_number = None
             key = printed_number if printed_number else f"p{physical_index}"
             results[key] = text
-
             print(f"[DEBUG] Page {physical_index} => stored as key '{key}' (printed: {printed_number})")
 
-    print(f"Total pages captured: {len(results)}")
-    return results
+    
+            if key == "10" :
+                financial_statement_page_number = find_item_8(results)
+                if not financial_statement_page_number:
+                    print("Item 8 not found")
+                    return None
+
+    # Step 3 — find the consolidated statements page number
+            if key == str(financial_statement_page_number):
+                consolidated_statement_num = find_consolidated_statements(financial_statement_page_number, results)
+                if not consolidated_statement_num:
+                    print("Consolidated Statements not found")
+                    return None
+
+    # Step 4 — return that page's text
+            if key == str(consolidated_statement_num):
+                return results.get(str(consolidated_statement_num))
+        return "Not Found"   
+            
+            
+
+
+
+    
 
 def upload_file(request):
     if request.method == "POST":
@@ -88,10 +105,9 @@ def upload_file(request):
         if form.is_valid() and uploaded_file and uploaded_file.name.lower().endswith(".pdf"):
             period_end_date = form.cleaned_data.get("period_end_date")
             extracted_pages = handle_uploaded_file(uploaded_file, period_end_date)
-            extracted_data = find_financial_section(extracted_pages)
 
             return HttpResponse(
-                f"<h2>Extracted Text:</h2><pre>{json.dumps(extracted_data, indent=2, ensure_ascii=False)}</pre>"
+                f"<h2>Extracted Text:</h2><pre>{json.dumps(extracted_pages, indent=2, ensure_ascii=False)}</pre>"
             )
         else:
             return HttpResponseBadRequest("Invalid form or not a PDF file.")
