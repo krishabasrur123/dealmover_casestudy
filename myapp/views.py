@@ -1,13 +1,14 @@
 from django.shortcuts import render, HttpResponse
 from .models import financial_info
 from .forms import UploadPDFForm
-from .serializers import Financial_InfoSerializers
+from rest_framework.decorators import api_view
+from .serializers import ExtractRequestSerializer
+from rest_framework.response import Response
 from django.http import HttpResponseBadRequest
 from rest_framework import viewsets
 import pdfplumber
 import spacy
 import regex as re
-from django.http import JsonResponse
 
   
 ITEM8_PATTERN = re.compile(
@@ -146,7 +147,6 @@ def handle_uploaded_file(uploaded_file, end_date):
     results = {}
     financial_statement_page_number=None
     consolidated_statement_num=None
-    # Step 1 — read all pages into results
     with pdfplumber.open(uploaded_file) as pdf:
         for physical_index, page in enumerate(pdf.pages, start=1):
             text = page.extract_text() or ""
@@ -169,14 +169,12 @@ def handle_uploaded_file(uploaded_file, end_date):
                     print("Item 8 not found")
                     return None
 
-    # Step 3 — find the consolidated statements page number
             if key == str(financial_statement_page_number):
                 consolidated_statement_num = find_consolidated_statements(financial_statement_page_number, results)
                 if not consolidated_statement_num:
                     print("Consolidated Statements not found")
                     return None
 
-    # Step 4 — return that page's text
             if key == str(consolidated_statement_num):
                 return results.get(str(consolidated_statement_num))
         return "Not Found"   
@@ -206,30 +204,39 @@ def revenue_cos_returns(data, period_end_date):
     return result
 
 
-def upload_file(request):
-    if request.method == "POST":
-        print("FILES:", request.FILES)
-        print("POST:", request.POST)
-        form = UploadPDFForm(request.POST, request.FILES)
-        uploaded_file = request.FILES.get("file")
+@api_view(['POST'])
+def extract_view(request):
+    serializer = ExtractRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        uploaded_file = serializer.validated_data['file']
+        period_end_date = serializer.validated_data.get('period_end_date')
 
-        if form.is_valid() and uploaded_file and uploaded_file.name.lower().endswith(".pdf"):
-            period_end_date = form.cleaned_data.get("period_end_date")
-            extracted_pages = handle_uploaded_file(uploaded_file, period_end_date)
-            combined = {}
+        extracted_pages = handle_uploaded_file(uploaded_file, period_end_date)
+        if not extracted_pages:
+            return Response({"error": "Could not extract relevant pages."}, status=400)
 
-            if (extracted_pages):
-                combined = {
-                        "revenue":find_financial_terms(extracted_pages, revenue_keywords) ,
-                        "cost":  find_financial_terms(extracted_pages, cost_keywords)}
-                
-            output=revenue_cos_returns(combined,period_end_date)
-            return JsonResponse({"data": output}) 
+        combined = {
+            "revenue": find_financial_terms(extracted_pages, revenue_keywords),
+            "cost": find_financial_terms(extracted_pages, cost_keywords)
+        }
+
+        output = revenue_cos_returns(combined, period_end_date)
+
+        if period_end_date:
+            output = revenue_cos_returns(combined, period_end_date)
         else:
-            return HttpResponseBadRequest("Invalid form or not a PDF file.")
-    else:
-        return JsonResponse({"error": "Invalid form or not a PDF file."}, status=400)
+            output = {
+                "revenue": combined["revenue"].get("values", [None])[0],
+                "cos": combined["cost"].get("values", [None])[0]
+            }
 
-class Financial_InfoViewSet(viewsets.ModelViewSet):
-    queryset = financial_info.objects.all()
-    serializer_class = Financial_InfoSerializers
+        
+        return Response({
+            "period_end_date": str(period_end_date) if period_end_date else None,
+            "results": {
+                "revenue": output.get("revenue"),
+                "cos": output.get("cost")
+            }
+        })
+    return Response(serializer.errors, status=400)
+
