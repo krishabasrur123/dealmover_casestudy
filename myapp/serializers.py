@@ -13,3 +13,8 @@ class Financial_InfoSerializers (serializers.ModelSerializer):
     class Meta:
         model = financial_info
         fields =  fields = ["period_end_date", "results"]
+
+class ExtractRequestSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
+    period_end_date = serializers.DateField(required=False)
+

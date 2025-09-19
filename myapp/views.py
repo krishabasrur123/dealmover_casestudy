@@ -6,11 +6,10 @@ from django.http import HttpResponseBadRequest
 from rest_framework import viewsets
 import pdfplumber
 import spacy
-from spacy.matcher import PhraseMatcher
 import regex as re
-import json
-import threading
+from django.http import JsonResponse
 
+  
 ITEM8_PATTERN = re.compile(
     r'Item\s+8[:.;]?\s*Financial Statements(?: and Supplementary Data)?[.:;]?\s+(\d{1,3})',
     re.IGNORECASE
@@ -143,6 +142,7 @@ def find_consolidated_statements(financial_statement_page_number, results_dict):
     return consolidated_table_of_content_page_num
     
 def handle_uploaded_file(uploaded_file, end_date):
+   
     results = {}
     financial_statement_page_number=None
     consolidated_statement_num=None
@@ -208,6 +208,8 @@ def revenue_cos_returns(data, period_end_date):
 
 def upload_file(request):
     if request.method == "POST":
+        print("FILES:", request.FILES)
+        print("POST:", request.POST)
         form = UploadPDFForm(request.POST, request.FILES)
         uploaded_file = request.FILES.get("file")
 
@@ -222,13 +224,11 @@ def upload_file(request):
                         "cost":  find_financial_terms(extracted_pages, cost_keywords)}
                 
             output=revenue_cos_returns(combined,period_end_date)
-            return HttpResponse(
-                f"<h2>Extracted Text:</h2><pre>{json.dumps(output, indent=2, ensure_ascii=False)}</pre>"
-            )
+            return JsonResponse({"data": output}) 
         else:
             return HttpResponseBadRequest("Invalid form or not a PDF file.")
     else:
-        return render(request, "upload.html", {"form": UploadPDFForm()})
+        return JsonResponse({"error": "Invalid form or not a PDF file."}, status=400)
 
 class Financial_InfoViewSet(viewsets.ModelViewSet):
     queryset = financial_info.objects.all()

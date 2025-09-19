@@ -1,15 +1,6 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import Financial_InfoViewSet
-from . import views
-# defines actual pages roots of my app
+from django.urls import path
+from .views import extract_view
 
-
-router= DefaultRouter()
-router.register(r'extract', Financial_InfoViewSet)
-urlpatterns=[
-    path("api/", include(router.urls)),
-    path("upload/", views.upload_file, name="upload_file"),
-
+urlpatterns = [
+    path("api/extract/", extract_view, name="extract"),
 ]
-
