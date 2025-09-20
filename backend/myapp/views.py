@@ -31,9 +31,10 @@ cost_keywords = [ "cost of sales ","cost of revenues"]
 
 
 TOC_PATTERN = re.compile(
-    r'(Consolidated\s+Statements\s+of\s+(?:Income|Earnings|Operations|Profit\s+and\s+Loss))\s+(\d{1,3})',
+    r'(Consolidated\s+Statements\s+of\s+(?:Income|Earnings|Operations|Profit\s+and\s+Loss))\s+(?:Page\s*)?(\d{1,3})',
     re.IGNORECASE
 )
+
 
 page_num_patterns = re.compile(
     r"""
@@ -45,22 +46,7 @@ page_num_patterns = re.compile(
     re.IGNORECASE | re.MULTILINE | re.VERBOSE
 )
 
-def extract_years(text):
-    lines = text.split("\n")
-    candidate_lines = []
 
-    for line in lines:
-        if re.search(r'(Fiscal|Year Ended|in millions)', line, re.IGNORECASE):
-            candidate_lines.append(line)
-
-    if not candidate_lines:
-        candidate_lines = [line for line in lines if re.search(r'\b(19|20)\d{2}\b', line)]
-
-    years = []
-    for line in candidate_lines:
-        found = re.findall(r'\b(19|20)\d{2}\b', line)
-        years.extend(found)
-    return years
 
 def find_financial_terms(text, keyword_list):
     print("=== Searching for financial terms ===")
@@ -143,9 +129,13 @@ def find_consolidated_statements(financial_statement_page_number, results_dict):
     return consolidated_table_of_content_page_num
     
 def handle_uploaded_file(uploaded_file, end_date):
-    
+
    
     results = {}
+    itemCheck=False
+    financialCheck=False
+    revenueCheck=False
+
     financial_statement_page_number=None
     consolidated_statement_num=None
     with pdfplumber.open(uploaded_file) as pdf:
@@ -164,19 +154,22 @@ def handle_uploaded_file(uploaded_file, end_date):
             print(f"[DEBUG] Page {physical_index} => stored as key '{key}' (printed: {printed_number})")
 
     
-            if key is not None and int(key) >= 10 :
+            if key is not None and int(key) >= 10  and not itemCheck:
                 financial_statement_page_number = find_item_8(results)
+                itemCheck=True
                 if not financial_statement_page_number:
                     print("Item 8 not found")
                     return None
 
-            if key is not None and financial_statement_page_number is not None and int(key) >= int(financial_statement_page_number):
+            if key is not None and financial_statement_page_number is not None and not financialCheck and int(key) >= int(financial_statement_page_number):
                 consolidated_statement_num = find_consolidated_statements(financial_statement_page_number, results)
+                financialCheck=True
                 if not consolidated_statement_num:
                     print("Consolidated Statements not found")
                     return None
 
-            if key is not None and consolidated_statement_num is not None and int(key) >= int(consolidated_statement_num):
+            if key is not None and consolidated_statement_num is not None and  not revenueCheck and int(key) >= int(consolidated_statement_num):
+                revenueCheck=True
                 return results.get(str(consolidated_statement_num))
         return "Not Found"   
             

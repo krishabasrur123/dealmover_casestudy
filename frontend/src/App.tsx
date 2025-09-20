@@ -49,7 +49,12 @@ for (let i = 0; i < results.revenue.length; i++) {
 
   const profit = Number(revenueValue) - Number(costValue);
 
-    grossProfitRow.push({ value: profit.toLocaleString() });
+const isValid = revenueValue !=="" || costValue!==""
+
+grossProfitRow.push({
+  value: isValid ? profit.toString() : "Error"
+});
+
   }
 }
     
@@ -152,7 +157,10 @@ setHasError(false);
           display: 'inline-block',
           width: '120px',
           height: '40px',
-          padding: '12px',
+          padding: '32px',
+          marginTop:'15px',
+          marginLeft:'2px',
+          marginRight:'2px',
           fontSize: '16px',
           color: isGreenText ? 'green' : '#333',
           background: isGreenText? '#b7eeffff' : 'white',
