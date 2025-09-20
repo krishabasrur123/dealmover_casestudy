@@ -10,7 +10,7 @@ function App() {
   const [results, setResults] = useState<{ revenue: string[]; cost: string[];    date: string[]} | null>(null);
   const [loading, setLoading] = useState(false); // Loading state
 
-
+  const [hasError, setHasError] = useState(false);
 
 
   const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,11 +91,23 @@ for (let i = 0; i < results.revenue.length; i++) {
   cost: costValues.length ? costValues : ["Error: No Cost of Sales found"],
   date: dateValues,
 });
-
+setHasError(false);
 
 
 
     } catch (error: any) {
+
+ const status = error.response?.status;
+  const message = error.response?.data || error.message;
+  setHasError(true);
+
+  if (status === 500) {
+    alert("Internal server error. Please check your file and try again.");
+  } else {
+    alert(`Upload failed: ${message} Status Code: ${status}`);
+  }
+
+  
       console.error("Upload error:", error.response?.data || error.message);
       setResults({
         revenue: ["Error: No Revenue Found"],
@@ -112,8 +124,8 @@ for (let i = 0; i < results.revenue.length; i++) {
 
   return (
     <div>
-      <h1>Financial Value Extractor</h1>
-      <h3>Please upload the 10-K document and an optional period date</h3>
+      <h1 className='block-3d'>Financial Value Extractor </h1>
+      <h3 style={{color: '#81e785ff', fontSize:'25px',fontFamily:'monospace', fontStyle:'inherit'}}>Please upload the 10-K document and an optional period date</h3>
 
       <div>
         <input type="file" onChange={onFileChange} />
@@ -123,10 +135,39 @@ for (let i = 0; i < results.revenue.length; i++) {
 
       {loading && <p>Processing your file, please wait...</p>}
 
-      {!loading && results && <Spreadsheet data={spreadsheet()} columnLabels={[]}
-  rowLabels={[]} 
+      {!loading && !hasError&&results && <Spreadsheet
+  data={spreadsheet()}
+  columnLabels={[]}
+  rowLabels={[]}
   hideRowIndicators={true}
-  hideColumnIndicators={true}/>}
+  hideColumnIndicators={true}
+  Cell={(props) => {
+    const isFirstColumn = props.column === 0;
+
+    const isGreenText = isFirstColumn ;
+
+    return (
+      <div
+        style={{
+          display: 'inline-block',
+          width: '120px',
+          height: '40px',
+          padding: '12px',
+          fontSize: '16px',
+          color: isGreenText ? 'green' : '#333',
+          background: isGreenText? '#b7eeffff' : 'white',
+          fontWeight: isGreenText ? 'bold' : 'normal',
+          border: '2px solid #339fc0ff',
+          textAlign: 'center',
+          verticalAlign: 'middle',
+        }}
+      >
+        {props.data?.value}
+      </div>
+    );
+  }}
+/>
+}
 
     </div>
   );

@@ -143,6 +143,7 @@ def find_consolidated_statements(financial_statement_page_number, results_dict):
     return consolidated_table_of_content_page_num
     
 def handle_uploaded_file(uploaded_file, end_date):
+    
    
     results = {}
     financial_statement_page_number=None
@@ -230,7 +231,7 @@ def extract_view(request):
 
         
         return Response({
-            "period_end_date": (str(period_end_date) if period_end_date else [int(y) for y in output.get("years", []) if y.isdigit()]),
+            "period_end_date": (str(period_end_date.year) if period_end_date else [int(y) for y in output.get("years", []) if y.isdigit()]),
             "results": {
                 "revenue": output.get("revenue"),
                 "cos": output.get("cost")
