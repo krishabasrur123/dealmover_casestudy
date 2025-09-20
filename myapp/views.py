@@ -155,7 +155,7 @@ def handle_uploaded_file(uploaded_file, end_date):
                 printed_number = next((g for g in m.groups() if g), None)
             else:
                 printed_number = None
-            key = printed_number if printed_number else f"p{physical_index}"
+            key = printed_number if printed_number else f"{-physical_index}"
             results[key] = text
 
 
@@ -163,19 +163,19 @@ def handle_uploaded_file(uploaded_file, end_date):
             print(f"[DEBUG] Page {physical_index} => stored as key '{key}' (printed: {printed_number})")
 
     
-            if key == "10" :
+            if key is not None and int(key) >= 10 :
                 financial_statement_page_number = find_item_8(results)
                 if not financial_statement_page_number:
                     print("Item 8 not found")
                     return None
 
-            if key == str(financial_statement_page_number):
+            if key is not None and financial_statement_page_number is not None and int(key) >= int(financial_statement_page_number):
                 consolidated_statement_num = find_consolidated_statements(financial_statement_page_number, results)
                 if not consolidated_statement_num:
                     print("Consolidated Statements not found")
                     return None
 
-            if key == str(consolidated_statement_num):
+            if key is not None and consolidated_statement_num is not None and int(key) >= int(consolidated_statement_num):
                 return results.get(str(consolidated_statement_num))
         return "Not Found"   
             

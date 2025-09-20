@@ -30,14 +30,18 @@ const spreadsheet = () => {
   if (!results) return [];
 
   if (results) {
-   headerRow = [{ value: "" }, ...results.date.map((y) => ({ value: y }))];
+headerRow.push({ value: "Years" }); 
 
-   revenueRow = [
-    { value: "Revenue" },
-    ...results.revenue.map((r) => ({ value: r })),
-  ];
+for (let i = 0; i < results.date.length; i++) {
+  headerRow.push({ value: results.date[i] }); 
+}
+ 
+revenueRow.push({ value: "Revenue" });
 
-  const grossProfitRow: any[] = [{ value: "Gross Profit" }];
+for (let i = 0; i < results.revenue.length; i++) {
+  revenueRow.push({ value: results.revenue[i] });
+}
+grossProfitRow.push({ value: "Gross Profit" });
 
 for (let i = 0; i < results.revenue.length; i++) {
   const revenueValue = results.revenue[i].replace(/[^0-9.-]+/g, "");
@@ -119,7 +123,11 @@ for (let i = 0; i < results.revenue.length; i++) {
 
       {loading && <p>Processing your file, please wait...</p>}
 
-      {!loading && results && <Spreadsheet data={spreadsheet()} />}
+      {!loading && results && <Spreadsheet data={spreadsheet()} columnLabels={[]}
+  rowLabels={[]} 
+  hideRowIndicators={true}
+  hideColumnIndicators={true}/>}
+
     </div>
   );
 }
