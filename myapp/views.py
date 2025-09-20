@@ -183,25 +183,31 @@ def handle_uploaded_file(uploaded_file, end_date):
 
 
 
+def revenue_cos_returns(data, period_end_date=None):
+    result = {}
 
-def revenue_cos_returns(data, period_end_date):
-    year = str(period_end_date.year)
-    result={}
     for key in ["revenue", "cost"]:
         years = data[key].get("years", [])
         values = data[key].get("values", [])
 
-        if not years or not values:
-            result[key] = f"Cannot be extracted: no {key} years or values found."
+        if not values:
+            result[key] = [] if period_end_date is None else None
             continue
 
-        if str(year) in years:
-            idx = years.index(str(year))
-            result[key] = values[idx]
+        if period_end_date is not None:
+            year = str(period_end_date.year)
+            if year in years:
+                idx = years.index(year)
+                result[key] = values[idx]  
+            else:
+                result[key] = None  
         else:
-            result[key] = f"Cannot be extracted: year {year} not found."
+            result[key] = values 
+    if period_end_date is None:
+        result["years"] = data["revenue"].get("years", [])
 
     return result
+
 
 
 @api_view(['POST'])
@@ -222,17 +228,9 @@ def extract_view(request):
 
         output = revenue_cos_returns(combined, period_end_date)
 
-        if period_end_date:
-            output = revenue_cos_returns(combined, period_end_date)
-        else:
-            output = {
-                "revenue": combined["revenue"].get("values", [None])[0],
-                "cos": combined["cost"].get("values", [None])[0]
-            }
-
         
         return Response({
-            "period_end_date": str(period_end_date) if period_end_date else None,
+            "period_end_date": (str(period_end_date) if period_end_date else [int(y) for y in output.get("years", []) if y.isdigit()]),
             "results": {
                 "revenue": output.get("revenue"),
                 "cos": output.get("cost")

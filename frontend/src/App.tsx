@@ -1,20 +1,60 @@
 import { useState } from 'react';
 import axios from "axios";
 import './App.css';
+import Spreadsheet from "react-spreadsheet";
+
 
 function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
-  const [results, setResults] = useState<{ revenue: string; cost: string } | null>(null);
+  const [results, setResults] = useState<{ revenue: string[]; cost: string[];    date: string[]} | null>(null);
   const [loading, setLoading] = useState(false); // Loading state
+
+
+
 
   const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFile(event.target.files?.[0] || null);
+    
   };
 
   const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(event.target.value);
   };
+let headerRow: any[] = [];
+let revenueRow: any[] = [];
+let grossProfitRow: any[] = [];
+
+
+const spreadsheet = () => {
+  if (!results) return [];
+
+  if (results) {
+   headerRow = [{ value: "" }, ...results.date.map((y) => ({ value: y }))];
+
+   revenueRow = [
+    { value: "Revenue" },
+    ...results.revenue.map((r) => ({ value: r })),
+  ];
+
+  const grossProfitRow: any[] = [{ value: "Gross Profit" }];
+
+for (let i = 0; i < results.revenue.length; i++) {
+  const revenueValue = results.revenue[i].replace(/[^0-9.-]+/g, "");
+  const costValue = results.cost[i].replace(/[^0-9.-]+/g, "");
+
+  const profit = Number(revenueValue) - Number(costValue);
+
+    grossProfitRow.push({ value: profit.toLocaleString() });
+  }
+}
+    
+  return [headerRow, revenueRow, grossProfitRow];
+}
+
+
+
+  
 
   const onFileUpload = async () => {
     if (!selectedFile) {
@@ -36,24 +76,35 @@ function App() {
       );
 
       const data = response.data.results;
+      const date = response.data.period_end_date;
+      let dateValues = Array.isArray(date) ? date : [date];
+   
+      const revenueValues = Array.isArray(data.revenue)? data.revenue: (data.revenue ? [data.revenue] : []);
 
+      const costValues = Array.isArray(data.cos)? data.cos: (data.cos ? [data.cos] : []);
       setResults({
-        revenue: data.revenue || "Error: No Revenue Found",
-        cost: data.cos || "Error: No Cost of Sales found",
-      });
+  revenue: revenueValues.length ? revenueValues : ["Error: No Revenue Found"],
+  cost: costValues.length ? costValues : ["Error: No Cost of Sales found"],
+  date: dateValues,
+});
+
+
+
+
     } catch (error: any) {
       console.error("Upload error:", error.response?.data || error.message);
       setResults({
-        revenue: "Error: No Revenue Found",
-        cost: "Error: No Cost of Sales found",
+        revenue: ["Error: No Revenue Found"],
+        cost: ["Error: No Cost of Sales found"],
+        date:[]
       });
     } finally {
       setLoading(false); // Hide loading
     }
   };
 
-  const revenue = results?.revenue ?? "";
-  const cost = results?.cost ?? "";
+
+
 
   return (
     <div>
@@ -66,38 +117,9 @@ function App() {
         <button onClick={onFileUpload}>Upload!</button>
       </div>
 
-      {/* Loading message */}
       {loading && <p>Processing your file, please wait...</p>}
 
-      {/* Show table only if results exist and not loading */}
-      {!loading && results && (
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Revenue</td>
-              <td>{revenue}</td>
-            </tr>
-            <tr>
-              <td>Cost of Sales</td>
-              <td>{cost}</td>
-            </tr>
-            <tr>
-              <td>Gross Profit</td>
-              <td>
-                {Number(revenue) && Number(cost)
-                  ? (Number(revenue) - Number(cost)).toLocaleString()
-                  : "-"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+      {!loading && results && <Spreadsheet data={spreadsheet()} />}
     </div>
   );
 }
